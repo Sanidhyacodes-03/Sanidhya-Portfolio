@@ -10,7 +10,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// -------------------- Middleware --------------------
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -26,29 +26,28 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log("✅ MongoDB connected");
   } catch (error) {
-    console.error("❌ MongoDB connection error:");
+    console.error("❌ MongoDB connection error");
     console.error(error);
   }
 };
 
 connectDB();
 
-// -------------------- Nodemailer --------------------
+// -------------------- Gmail SMTP --------------------
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: Number(process.env.EMAIL_PORT) || 465,
+  secure: true, // Required for port 465
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
 });
 
-// Verify SMTP connection
+// Verify SMTP on server start
 transporter.verify((error, success) => {
   if (error) {
-    console.error("❌ SMTP Error:");
+    console.error("❌ SMTP Error");
     console.error(error);
   } else {
     console.log("✅ Gmail SMTP Connected");
@@ -67,17 +66,18 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Contact API
+// -------------------- Contact API --------------------
 app.post("/api/contact", async (req, res) => {
-  const { name, email, subject, message } = req.body;
-
-  if (!name || !email || !subject || !message) {
-    return res.status(400).json({
-      message: "All fields are required.",
-    });
-  }
-
   try {
+    const { name, email, subject, message } = req.body;
+
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required.",
+      });
+    }
+
     // Save to MongoDB
     const savedMessage = await Message.create({
       name,
@@ -96,15 +96,11 @@ app.post("/api/contact", async (req, res) => {
       subject: `Portfolio Inquiry: ${subject}`,
       html: `
         <h2>New Portfolio Inquiry</h2>
-
+        <hr>
         <p><strong>Name:</strong> ${name}</p>
-
         <p><strong>Email:</strong> ${email}</p>
-
         <p><strong>Subject:</strong> ${subject}</p>
-
         <p><strong>Message:</strong></p>
-
         <p>${message}</p>
       `,
       text: `
